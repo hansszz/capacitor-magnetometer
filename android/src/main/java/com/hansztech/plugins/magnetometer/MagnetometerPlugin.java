@@ -1,4 +1,4 @@
-package com.example.capacitormagnetometer;
+package com.hansztech.plugins.magnetometer;
 
 import android.content.Context;
 import android.hardware.Sensor;
