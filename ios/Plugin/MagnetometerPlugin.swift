@@ -65,13 +65,21 @@ public class MagnetometerPlugin: CAPPlugin {
         call.resolve()
     }
 
-    @objc private func appDidBecomeActive() {
-        // Resume magnetometer updates if they were previously running
-        if isUpdating {
-            motionManager.startMagnetometerUpdates()
-            print("Resumed magnetometer updates after becoming active.")
+@objc private func appDidBecomeActive() {
+    // Check if the updates were previously being received
+    if isUpdating {
+        // Reconfigure the motion manager if needed
+        motionManager.magnetometerUpdateInterval = previousUpdateInterval // make sure this is stored somewhere
+
+        // Restart the magnetometer updates
+        motionManager.startMagnetometerUpdates(to: motionQueue) { [weak self] (magnetometerData, error) in
+            // Same as before
         }
+
+        print("Attempted to resume magnetometer updates after becoming active.")
     }
+}
+
 
     @objc private func appDidEnterBackground() {
         // Pause magnetometer updates to conserve battery
