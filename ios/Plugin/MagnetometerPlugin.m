@@ -7,4 +7,6 @@ CAP_PLUGIN(MagnetometerPlugin, "Magnetometer",
            CAP_PLUGIN_METHOD(echo, CAPPluginReturnPromise);
            CAP_PLUGIN_METHOD(startMagnetometerUpdates, CAPPluginReturnPromise);
            CAP_PLUGIN_METHOD(stopMagnetometerUpdates, CAPPluginReturnPromise);
+           CAP_PLUGIN_METHOD(addListener, CAPPluginReturnNone);
+           CAP_PLUGIN_METHOD(removeListener, CAPPluginReturnNone);
 )

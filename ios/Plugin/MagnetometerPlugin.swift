@@ -6,62 +6,82 @@ import CoreMotion
 public class MagnetometerPlugin: CAPPlugin {
     private let motionManager = CMMotionManager()
     private let motionQueue = OperationQueue()
+    private var isUpdating = false
 
     public override func load() {
         motionQueue.name = "MagnetometerMotionQueue"
         if motionManager.isMagnetometerAvailable {
-            motionManager.magnetometerUpdateInterval = 0.016 // Default to ~60Hz
+            motionManager.magnetometerUpdateInterval = 1.0 / 60.0 // Default to ~60Hz
             print("Magnetometer is available and the default update interval is set.")
         } else {
             print("Magnetometer is not available on this device.")
         }
+
+        NotificationCenter.default.addObserver(self,
+                                               selector: #selector(appDidBecomeActive),
+                                               name: UIApplication.didBecomeActiveNotification,
+                                               object: nil)
+        NotificationCenter.default.addObserver(self,
+                                               selector: #selector(appDidEnterBackground),
+                                               name: UIApplication.didEnterBackgroundNotification,
+                                               object: nil)
     }
 
     @objc func startMagnetometerUpdates(_ call: CAPPluginCall) {
         guard motionManager.isMagnetometerAvailable else {
             call.reject("Magnetometer sensor not available.")
-            print("Magnetometer sensor not available - cannot start updates.")
             return
         }
 
-        let frequency = call.getFloat("frequency") ?? 60.0 // Default to 60 Hz if not provided
+        let frequency = call.getFloat("frequency") ?? 1.0 // Default to 1 Hz if not provided
         motionManager.magnetometerUpdateInterval = 1.0 / Double(frequency)
         print("Starting magnetometer updates with frequency: \(frequency) Hz")
 
         motionManager.startMagnetometerUpdates(to: motionQueue) { [weak self] (magnetometerData, error) in
-            guard error == nil else {
+            guard error == nil, let data = magnetometerData else {
                 DispatchQueue.main.async {
-                    call.reject("Error starting magnetometer updates: \(error!.localizedDescription)")
+                    call.reject("Error starting magnetometer updates: \(error?.localizedDescription ?? "Unknown error")")
                 }
-                print("Error starting magnetometer updates: \(error!.localizedDescription)")
                 return
             }
 
-            if let data = magnetometerData {
-                var ret = JSObject()
-                ret["x"] = data.magneticField.x
-                ret["y"] = data.magneticField.y
-                ret["z"] = data.magneticField.z
-                DispatchQueue.main.async {
-                    self?.notifyListeners("magnetometerData", data: ret)
-                }
-                print("Magnetometer data: \(ret)")
+            var ret = JSObject()
+            ret["x"] = data.magneticField.x
+            ret["y"] = data.magneticField.y
+            ret["z"] = data.magneticField.z
+            DispatchQueue.main.async {
+                self?.notifyListeners("magnetometerData", data: ret)
             }
         }
 
+        isUpdating = true
         call.resolve()
     }
 
     @objc func stopMagnetometerUpdates(_ call: CAPPluginCall) {
         motionManager.stopMagnetometerUpdates()
+        isUpdating = false
         print("Stopped magnetometer updates.")
         call.resolve()
     }
 
+    @objc private func appDidBecomeActive() {
+        // Resume magnetometer updates if they were previously running
+        if isUpdating {
+            motionManager.startMagnetometerUpdates()
+            print("Resumed magnetometer updates after becoming active.")
+        }
+    }
+
+    @objc private func appDidEnterBackground() {
+        // Pause magnetometer updates to conserve battery
+        motionManager.stopMagnetometerUpdates()
+        print("Paused magnetometer updates after entering background.")
+    }
+
     deinit {
-        // Clean up the magnetometer updates when the plugin is destroyed
+        NotificationCenter.default.removeObserver(self)
         motionManager.stopMagnetometerUpdates()
         print("MagnetometerPlugin deinitialized.")
     }
 }
-
